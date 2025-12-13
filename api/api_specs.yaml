@@ -1,0 +1,407 @@
+openapi: 3.0.3
+info:
+  title: Missing Person API
+  description: |
+    Backend API untuk pelaporan orang hilang dengan async image processing.
+    Image akan di-resize oleh worker pool secara concurrent setelah upload.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+
+tags:
+  - name: Missing Persons
+    description: Operations untuk pelaporan orang hilang
+
+paths:
+  /missing-persons:
+    post:
+      tags:
+        - Missing Persons
+      summary: Create missing person report (Async)
+      description: |
+        Upload data orang hilang dengan foto. Image akan diproses secara async 
+        oleh worker pool untuk resize ke berbagai ukuran.
+
+        Flow:
+        1. Upload original image ke Cloudinary
+        2. Simpan data dengan status `processing`
+        3. Return response immediately (non-blocking)
+        4. Worker pool akan resize image di background
+        5. Status berubah menjadi `ready` setelah selesai
+      operationId: createMissingPerson
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - name
+                - description
+                - last_seen
+                - contact
+                - photo
+              properties:
+                name:
+                  type: string
+                  description: Nama lengkap orang hilang
+                  example: "Budi Santoso"
+                age:
+                  type: integer
+                  description: Umur orang hilang
+                  minimum: 0
+                  maximum: 150
+                  example: 25
+                description:
+                  type: string
+                  description: Deskripsi lengkap (ciri-ciri fisik, pakaian, dll)
+                  example: "Tinggi 170cm, rambut pendek, pakai kaos merah"
+                last_seen:
+                  type: string
+                  description: Lokasi & waktu terakhir terlihat
+                  example: "Mall Kelapa Gading, 10 Desember 2024 pukul 15:00"
+                contact:
+                  type: string
+                  description: Nomor kontak yang bisa dihubungi
+                  example: "+628123456789"
+                photo:
+                  type: string
+                  format: binary
+                  description: File foto orang hilang (JPG/PNG, max 5MB)
+      responses:
+        "201":
+          description: Report created successfully (image processing in background)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateReportResponse"
+              example:
+                success: true
+                message: "Report created successfully. Image is being processed."
+                data:
+                  id: "550e8400-e29b-41d4-a716-446655440000"
+                  name: "Budi Santoso"
+                  age: 25
+                  description: "Tinggi 170cm, rambut pendek, pakai kaos merah"
+                  last_seen: "Mall Kelapa Gading, 10 Desember 2024 pukul 15:00"
+                  contact: "+628123456789"
+                  image_status: "processing"
+                  created_at: "2024-12-13T10:30:00Z"
+        "400":
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Validation failed"
+                details:
+                  - field: "photo"
+                    message: "Photo is required"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      tags:
+        - Missing Persons
+      summary: Get all missing person reports
+      description: Retrieve list of all missing person reports with pagination
+      operationId: getAllMissingPersons
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: status
+          in: query
+          description: Filter by image status
+          schema:
+            type: string
+            enum: [processing, ready, failed]
+      responses:
+        "200":
+          description: List of reports retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetAllReportsResponse"
+              example:
+                success: true
+                data:
+                  reports:
+                    - id: "550e8400-e29b-41d4-a716-446655440000"
+                      name: "Budi Santoso"
+                      age: 25
+                      description: "Tinggi 170cm, rambut pendek"
+                      last_seen: "Mall Kelapa Gading"
+                      contact: "+628123456789"
+                      image_status: "ready"
+                      images:
+                        thumbnail: "https://res.cloudinary.com/demo/image/upload/w_200,h_200,c_fill/missing_persons/abc123xyz.jpg"
+                        medium: "https://res.cloudinary.com/demo/image/upload/w_600/missing_persons/abc123xyz.jpg"
+                        large: "https://res.cloudinary.com/demo/image/upload/w_1200/missing_persons/abc123xyz.jpg"
+                        original: "https://res.cloudinary.com/demo/image/upload/missing_persons/abc123xyz.jpg"
+                      created_at: "2024-12-13T10:30:00Z"
+                  pagination:
+                    page: 1
+                    limit: 10
+                    total: 1
+                    total_pages: 1
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /missing-persons/{id}:
+    get:
+      tags:
+        - Missing Persons
+      summary: Get missing person report by ID
+      description: Retrieve detailed information of a specific missing person report
+      operationId: getMissingPersonById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID of the missing person report
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: Report retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetReportDetailResponse"
+              example:
+                success: true
+                data:
+                  id: "550e8400-e29b-41d4-a716-446655440000"
+                  name: "Budi Santoso"
+                  age: 25
+                  description: "Tinggi 170cm, rambut pendek, pakai kaos merah"
+                  last_seen: "Mall Kelapa Gading, 10 Desember 2024 pukul 15:00"
+                  contact: "+628123456789"
+                  photo_id: "missing_persons/abc123xyz"
+                  image_status: "ready"
+                  images:
+                    thumbnail: "https://res.cloudinary.com/demo/image/upload/w_200,h_200,c_fill/missing_persons/abc123xyz.jpg"
+                    medium: "https://res.cloudinary.com/demo/image/upload/w_600/missing_persons/abc123xyz.jpg"
+                    large: "https://res.cloudinary.com/demo/image/upload/w_1200/missing_persons/abc123xyz.jpg"
+                    original: "https://res.cloudinary.com/demo/image/upload/missing_persons/abc123xyz.jpg"
+                  created_at: "2024-12-13T10:30:00Z"
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: "Report not found"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Check API and worker pool health status
+      operationId: healthCheck
+      responses:
+        "200":
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  workers:
+                    type: object
+                    properties:
+                      active:
+                        type: integer
+                        example: 5
+                      queue_size:
+                        type: integer
+                        example: 2
+                  database:
+                    type: string
+                    example: "connected"
+                  cloudinary:
+                    type: string
+                    example: "connected"
+
+components:
+  schemas:
+    MissingPerson:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID primary key
+        name:
+          type: string
+          description: Nama orang hilang
+        age:
+          type: integer
+          description: Umur orang hilang
+        description:
+          type: string
+          description: Deskripsi lengkap
+        last_seen:
+          type: string
+          description: Lokasi & waktu terakhir terlihat
+        contact:
+          type: string
+          description: Nomor kontak
+        photo_id:
+          type: string
+          description: Cloudinary public_id
+        image_status:
+          type: string
+          enum: [processing, ready, failed]
+          description: Status processing image
+        images:
+          $ref: "#/components/schemas/ImageUrls"
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp pembuatan report
+
+    ImageUrls:
+      type: object
+      description: URLs untuk berbagai ukuran image (hanya ada jika status=ready)
+      properties:
+        thumbnail:
+          type: string
+          format: uri
+          description: 200x200px, cropped
+        medium:
+          type: string
+          format: uri
+          description: 600px width
+        large:
+          type: string
+          format: uri
+          description: 1200px width
+        original:
+          type: string
+          format: uri
+          description: Original size
+
+    CreateReportResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            age:
+              type: integer
+            description:
+              type: string
+            last_seen:
+              type: string
+            contact:
+              type: string
+            image_status:
+              type: string
+              enum: [processing]
+            created_at:
+              type: string
+              format: date-time
+
+    GetAllReportsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            reports:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissingPerson"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+
+    GetReportDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/MissingPerson"
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
