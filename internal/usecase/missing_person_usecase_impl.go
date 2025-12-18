@@ -46,3 +46,10 @@ func (service *MissingPersonUsecaseImpl) FindByID(ctx context.Context, id uuid.U
 	
 	return missingPerson, nil
 }
+
+func (service *MissingPersonUsecaseImpl) GetAll(ctx context.Context, page int, limit int) ([]model.MissingPersons, int64, error) {
+	missingPersons, total, err := service.repository.GetAll(ctx, page, limit)
+	exception.PanicIfError(err)
+	
+	return missingPersons, total, nil
+}

@@ -29,3 +29,40 @@ func (r *MissingPersonRepositoryImpl) FindByID(ctx context.Context, id uuid.UUID
 	exception.PanicIfError(err)
 	return &missingPerson, nil
 }
+
+func (r *MissingPersonRepositoryImpl) GetAll(
+	ctx context.Context,
+	page int,
+	limit int,
+) ([]model.MissingPersons, int64, error) {
+
+	var (
+		missingPersons []model.MissingPersons
+		total          int64
+	)
+
+	offset := (page - 1) * limit
+
+	// hitung total data
+	err := r.db.WithContext(ctx).
+		Where("image_status = ?", "ready").
+		Model(&model.MissingPersons{}).
+		Count(&total).Error
+		
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// ambil data per page
+	err = r.db.WithContext(ctx).
+		Where("image_status = ?", "ready").
+		Limit(limit).
+		Offset(offset).
+		Order("created_at DESC").
+		Find(&missingPersons).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return missingPersons, total, nil
+}
