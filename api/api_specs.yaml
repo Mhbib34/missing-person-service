@@ -135,12 +135,6 @@ paths:
             default: 10
             minimum: 1
             maximum: 100
-        - name: status
-          in: query
-          description: Filter by image status
-          schema:
-            type: string
-            enum: [processing, ready, failed]
       responses:
         "200":
           description: List of reports retrieved successfully
@@ -149,27 +143,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/GetAllReportsResponse"
               example:
-                success: true
+                status: OK
+                message: "List of reports retrieved successfully"
                 data:
-                  reports:
-                    - id: "550e8400-e29b-41d4-a716-446655440000"
-                      name: "Budi Santoso"
-                      age: 25
-                      description: "Tinggi 170cm, rambut pendek"
-                      last_seen: "Mall Kelapa Gading"
-                      contact: "+628123456789"
-                      image_status: "ready"
-                      images:
-                        thumbnail: "https://res.cloudinary.com/demo/image/upload/w_200,h_200,c_fill/missing_persons/abc123xyz.jpg"
-                        medium: "https://res.cloudinary.com/demo/image/upload/w_600/missing_persons/abc123xyz.jpg"
-                        large: "https://res.cloudinary.com/demo/image/upload/w_1200/missing_persons/abc123xyz.jpg"
-                        original: "https://res.cloudinary.com/demo/image/upload/missing_persons/abc123xyz.jpg"
-                      created_at: "2024-12-13T10:30:00Z"
-                  pagination:
-                    page: 1
-                    limit: 10
-                    total: 1
-                    total_pages: 1
+                  id: "550e8400-e29b-41d4-a716-446655440000"
+                  name: "Budi Santoso"
+                  age: 25
+                  description: "Tinggi 170cm, rambut pendek"
+                  last_seen: "Mall Kelapa Gading"
+                  contact: "+628123456789"
+                  image_status: "ready"
+                  photo_id: "https://res.cloudinary.com/demo/image/upload/w_600/missing_persons/abc123xyz.jpg"
+                  created_at: "2024-12-13T10:30:00Z"
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 1
+                  total_pages: 1
         "500":
           description: Internal server error
           content:
@@ -238,40 +228,6 @@ paths:
                 status: "INTERNAL SERVER ERROR"
                 error: "Internal server error"
 
-  /health:
-    get:
-      tags:
-        - System
-      summary: Health check
-      description: Check API and worker pool health status
-      operationId: healthCheck
-      responses:
-        "200":
-          description: System is healthy
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "healthy"
-                  workers:
-                    type: object
-                    properties:
-                      active:
-                        type: integer
-                        example: 5
-                      queue_size:
-                        type: integer
-                        example: 2
-                  database:
-                    type: string
-                    example: "connected"
-                  cloudinary:
-                    type: string
-                    example: "connected"
-
 components:
   schemas:
     MissingPerson:
@@ -303,33 +259,10 @@ components:
           type: string
           enum: [processing, ready, failed]
           description: Status processing image
-        images:
-          $ref: "#/components/schemas/ImageUrls"
         created_at:
           type: string
           format: date-time
           description: Timestamp pembuatan report
-
-    ImageUrls:
-      type: object
-      description: URLs untuk berbagai ukuran image (hanya ada jika status=ready)
-      properties:
-        thumbnail:
-          type: string
-          format: uri
-          description: 200x200px, cropped
-        medium:
-          type: string
-          format: uri
-          description: 600px width
-        large:
-          type: string
-          format: uri
-          description: 1200px width
-        original:
-          type: string
-          format: uri
-          description: Original size
 
     CreateReportResponse:
       type: object
@@ -366,17 +299,16 @@ components:
     GetAllReportsResponse:
       type: object
       properties:
-        success:
-          type: boolean
+        status:
+          type: string
+        message:
+          type: string
         data:
-          type: object
-          properties:
-            reports:
-              type: array
-              items:
-                $ref: "#/components/schemas/MissingPerson"
-            pagination:
-              $ref: "#/components/schemas/Pagination"
+          type: array
+          items:
+            $ref: "#/components/schemas/MissingPerson"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
 
     GetReportDetailResponse:
       type: object

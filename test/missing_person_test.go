@@ -62,6 +62,7 @@ func setupRouter(db *gorm.DB) http.Handler {
 	{
 		api.POST("/missing-persons", controller.Create)
 		api.GET("/missing-persons/:id", controller.FindByID)
+		api.GET("/missing-persons", controller.GetAll)
 	}
 
 	return r
@@ -278,4 +279,101 @@ func TestGetMissingPersonByIdFailedIfNotFound(t *testing.T) {
 
 	assert.Equal(t, "NOT FOUND", response["status"])
 	assert.Equal(t, "Report not found", response["error"])
+}
+
+
+func TestListMissingPersonSuccess(t *testing.T) {
+	truncateMissingPersons(testDB)
+
+	// ===== create data via GORM (UUID auto) =====
+	missingPerson := model.MissingPersons{
+		Name:        "Joko",
+		Age:         63,
+		Description: "celana pendek",
+		LastSeen:    "Medan",
+		Contact:     "08123456789",
+		PhotoID:     "test-image.jpg",
+		ImageStatus: "ready",
+	}
+
+	err := testDB.Create(&missingPerson).Error
+	assert.Nil(t, err)
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/missing-persons",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 1)
+
+	// ambil item pertama
+	item := data[0].(map[string]any)
+
+	assert.Equal(t, missingPerson.ID.String(), item["id"])
+	assert.Equal(t, "Joko", item["name"])
+	assert.Equal(t, float64(63), item["age"])
+	assert.Equal(t, "celana pendek", item["description"])
+	assert.Equal(t, "Medan", item["last_seen"])
+	assert.Equal(t, "08123456789", item["contact"])
+	assert.Equal(t, "ready", item["image_status"])
+	assert.Equal(t, "test-image.jpg", item["photo_id"])
+}
+
+func TestListMissingPersonSuccessWithPagination(t *testing.T) {
+	truncateMissingPersons(testDB)
+
+	// ===== create data via GORM (UUID auto) =====
+	missingPerson := model.MissingPersons{
+		Name:        "Joko",
+		Age:         63,
+		Description: "celana pendek",
+		LastSeen:    "Medan",
+		Contact:     "08123456789",
+		PhotoID:     "test-image.jpg",
+		ImageStatus: "ready",
+	}
+
+	err := testDB.Create(&missingPerson).Error
+	assert.Nil(t, err)
+
+	// ===== request GET =====
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/missing-persons?limit=1&page=2",
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	testRouter.ServeHTTP(recorder, req)
+
+	// ===== assert response =====
+	resp := recorder.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	var response map[string]any
+	_ = json.Unmarshal(respBody, &response)
+
+	assert.Equal(t, "OK", response["status"])
+
+	data := response["data"].([]any)
+	assert.Len(t, data, 0)
 }

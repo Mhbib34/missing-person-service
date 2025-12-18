@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -70,6 +71,37 @@ func (c *MissingPersonControllerImpl) FindByID(ctx *gin.Context) {
 		Status: "OK",
 		Message: "Report retrieved successfully",
 		Data:   missingPerson,
+	}
+
+	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
+}
+
+func (c *MissingPersonControllerImpl) GetAll(ctx *gin.Context) {
+	page := helper.StringToIntDefault(ctx.Query("page"), 1)
+	limit := helper.StringToIntDefault(ctx.Query("limit"), 10)
+
+	missingPersons, total, err := c.usecase.GetAll(
+		ctx.Request.Context(),
+		page,
+		limit,
+	)
+	if err != nil {
+		exception.ErrorHandler(ctx, err)
+		return
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	webResponse := dto.WebResponse{
+		Status:  "OK",
+		Message: "Report retrieved successfully",
+		Data:    missingPersons,
+		Pagination: &dto.Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      int(total),
+			TotalPages: totalPages,
+		},
 	}
 
 	helper.WriteToResponseBody(ctx, http.StatusOK, webResponse)
